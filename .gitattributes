@@ -1,0 +1,4 @@
+# Exclude third-party code and bundled assets from GitHub language statistics.
+tfd/tinyfiledialogs.c linguist-vendored
+tfd/tinyfiledialogs.h linguist-vendored
+assets/** linguist-vendored
