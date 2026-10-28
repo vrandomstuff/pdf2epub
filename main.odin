@@ -2,57 +2,70 @@
 
 package main
 
-import "core:strings"
 import "core:fmt"
 import "tfd"
+import "ui"
 import rl "vendor:raylib"
 
 WIDTH :: 800
 HEIGHT :: 600
-FONTSIZE :: 30
-FONTSPACE :: 3
-
-TextButton :: struct {
-	rec:   rl.Rectangle,
-	color: rl.Color,
-	text:  string,
-	id: int // this is not for the ui system it is for the developer to be able to use a switch in a for loop with some sort of enum
-}
-
-drawTextButton :: proc(button: TextButton, mouse: rl.Vector2, font: rl.Font) -> bool {
-	hovered: bool
-
-	cstr := strings.clone_to_cstring(button.text);
-	defer delete(cstr)
-
-	textSize: rl.Vector2 = rl.MeasureTextEx(font, cstr, FONTSIZE, FONTSPACE);
-
-	textPos: rl.Vector2;
-	textPos.x = button.rec.x + (button.rec.width - textSize.x) / 2;
-	textPos.y = button.rec.y + (button.rec.height - textSize.y) / 2;
-	color: rl.Color = button.color;
-	
-	if (rl.CheckCollisionPointRec(mouse, button.rec)) {
-		hovered = true;
-		color.r = u8(max(0, int(color.r) - 15))
-		color.g = u8(max(0, int(color.g) - 15))
-		color.b = u8(max(0, int(color.b) - 15))
-	} else {
-		hovered = false;
-	}
-	rl.DrawRectangleRec(button.rec, color);
-	
-	rl.DrawTextEx(font, cstr, textPos, FONTSIZE, FONTSPACE, rl.WHITE);
-	return hovered
-}
-
-checkButton :: proc(hovered: bool) -> bool {
-	return hovered && rl.IsMouseButtonPressed(rl.MouseButton.LEFT)
-}
 
 buttonIds :: enum int {
 	SelectEpubOutput,
 	SelectPdfInput
+}
+
+debuggingCheckmark := ui.CheckmarkButton{
+	pos = rl.Vector2{
+		HEIGHT/2,
+		WIDTH/2
+	},
+	color = rl.GRAY,
+	toggled = false,
+	icon = {},
+	id = 3
+}
+
+input: cstring = "";
+output: cstring = "";
+truncatePath :: proc(path: cstring) -> cstring {
+    if path == nil {
+        return nil
+    }
+    
+    s := string(path)
+    if len(s) == 0 {
+        return path
+    }
+    
+    sep_count := 0
+    target_idx := 0
+    
+    for i := len(s) - 1; i >= 0; i -= 1 {
+        b := s[i]
+        
+        is_sep := false
+        when ODIN_OS == .Windows {
+            is_sep = (b == '/' || b == '\\')
+        } else {
+            is_sep = (b == '/')
+        }
+        
+        if is_sep {
+            sep_count += 1
+            if sep_count == 3 {
+                target_idx = i + 1
+                break
+            }
+        }
+    }
+    
+    result_str := s[target_idx:]
+    if len(result_str) == 0 {
+        return cstring("")
+    }
+    
+    return cstring(raw_data(result_str))
 }
 
 main :: proc() {
@@ -61,9 +74,11 @@ main :: proc() {
 	rl.SetTargetFPS(60)
 	font := rl.LoadFont("assets/IosevkaNerdFontPropo-SemiBold.ttf");
 	defer rl.UnloadFont(font);
-
-	buttons := []TextButton {
-		TextButton{
+	checkmarkIcon := rl.LoadTexture("assets/check.png");
+	defer rl.UnloadTexture(checkmarkIcon);
+	debuggingCheckmark.icon = checkmarkIcon
+	buttons := []ui.TextButton {
+		ui.TextButton{
 			rec = rl.Rectangle{
 				x      = 0,
 				y      = 0,
@@ -74,7 +89,7 @@ main :: proc() {
 			text  = "Select Output",
 			id = cast(int)buttonIds.SelectEpubOutput
 		},
-		TextButton{
+		ui.TextButton{
 			rec = rl.Rectangle{
 				x      = 0,
 				y      = 50,
@@ -95,20 +110,51 @@ main :: proc() {
 		showButtonCursor := false;
 		mouse := rl.GetMousePosition();
 		for button in buttons {
-			hovered := drawTextButton(button, mouse, font)
+			hovered := ui.drawTextButton(button, mouse, font)
 
 			if hovered {
 				showButtonCursor = true;
 			}
 
-			pressed := checkButton(hovered);
+			pressed := ui.checkButton(hovered);
 			if(pressed) {
 				switch button.id {
-					case: fmt.println("TODO: implement press handlers");
+				case cast(int)buttonIds.SelectPdfInput: {
+					filters := [1]cstring{"*.pdf"}
+					fileDialog := tfd.tinyfd_openFileDialog(
+						"Select PDF",
+						nil,
+						1,
+						&filters[0],
+						"PDF files",
+						0,
+					)
+					if fileDialog != nil {
+						input = fileDialog
+					}
+				}
+				case cast(int)buttonIds.SelectEpubOutput: {
+					filters := [1]cstring{"*.epub"}
+					fileDialog := tfd.tinyfd_saveFileDialog(
+						"Select output",
+						nil,
+						1,
+						&filters[0],
+						"EPUB files",
+					)
+					if fileDialog != nil {
+						output = fileDialog
+					}
+				}
 				}
 			}
-		}
 
+			rl.DrawTextEx(font, truncatePath(output), rl.Vector2{212.25, 0}, ui.FONTSIZE, ui.FONTSPACE, rl.WHITE);
+			rl.DrawTextEx(font, truncatePath(input), rl.Vector2{198, 50}, ui.FONTSIZE, ui.FONTSPACE, rl.WHITE);
+		}
+		
+		hovered := ui.drawCheckmarkButton(debuggingCheckmark, mouse);
+		ui.checkCheckmarkButton(&debuggingCheckmark, hovered);
 		if showButtonCursor {
 			rl.SetMouseCursor(rl.MouseCursor.POINTING_HAND);
 		} else {

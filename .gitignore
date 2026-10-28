@@ -6,3 +6,7 @@
 *.obj
 *.exe
 *.lib
+*.pdb
+
+# i think rad debugger produces this
+*.rdi
