@@ -69,6 +69,8 @@ truncatePath :: proc(path: cstring) -> cstring {
 }
 
 main :: proc() {
+	rl.SetConfigFlags({rl.ConfigFlag.WINDOW_RESIZABLE})
+	
 	rl.InitWindow(WIDTH, HEIGHT, "PDF to EPUB")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
@@ -77,6 +79,7 @@ main :: proc() {
 	checkmarkIcon := rl.LoadTexture("assets/check.png");
 	defer rl.UnloadTexture(checkmarkIcon);
 	debuggingCheckmark.icon = checkmarkIcon
+	
 	buttons := []ui.TextButton {
 		ui.TextButton{
 			rec = rl.Rectangle{
